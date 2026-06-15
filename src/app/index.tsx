@@ -3,8 +3,11 @@
  * their auth state + onboarding completion.
  *
  *   not signed in           -> /login
- *   signed in, no onboarded -> /onboarding
+ *   signed in, no onboarded -> /welcome
  *   signed in, onboarded    -> /dashboard
+ *
+ * The layout's Boot component handles re-direction after auth changes
+ * (sign-in / sign-out) since this screen is unmounted after the first redirect.
  */
 import { Redirect } from "expo-router";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
@@ -31,7 +34,7 @@ export default function Index() {
   }
 
   if (!profile?.onboarded_at) {
-    return <Redirect href="/welcome" />;
+    return <Redirect href="/pick-topics" />;
   }
 
   return <Redirect href="/dashboard" />;

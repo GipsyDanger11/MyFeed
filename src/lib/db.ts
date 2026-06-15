@@ -174,12 +174,50 @@ export async function countActionsToday(userId: string): Promise<number> {
   return count ?? 0;
 }
 
+export async function countActionType(userId: string, action: string): Promise<number> {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const { count, error } = await supabase
+    .from("automation_logs")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("action", action)
+    .gte("created_at", startOfDay.toISOString());
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function avgRelevanceScore(userId: string): Promise<number> {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const { data, error } = await supabase
+    .from("automation_logs")
+    .select("relevance_score")
+    .eq("user_id", userId)
+    .gte("created_at", startOfDay.toISOString())
+    .not("relevance_score", "is", null);
+  if (error) throw error;
+  if (!data || data.length === 0) return 0;
+  const sum = data.reduce((acc, row) => acc + (row.relevance_score ?? 0), 0);
+  return Math.round(sum / data.length);
+}
+
+export async function countAllActions(userId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("automation_logs")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function insertAutomationLog(input: {
   userId: string;
   action: string;
   target?: string | null;
   success?: boolean;
   errorMessage?: string | null;
+  relevanceScore?: number | null;
 }): Promise<AutomationLog> {
   const { data, error } = await supabase
     .from("automation_logs")
@@ -189,6 +227,7 @@ export async function insertAutomationLog(input: {
       target: input.target ?? null,
       success: input.success ?? true,
       error_message: input.errorMessage ?? null,
+      relevance_score: input.relevanceScore ?? null,
     })
     .select()
     .single();

@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -66,6 +66,9 @@ export default function PreferencesEditScreen() {
         Object.entries(selection).map(([topic, direction]) => ({ topic, direction })),
       );
       router.back();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to save preferences.";
+      Alert.alert("Error", msg);
     } finally {
       setSaving(false);
     }

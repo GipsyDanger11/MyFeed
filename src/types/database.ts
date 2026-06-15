@@ -46,6 +46,7 @@ export interface AutomationLog {
   target: string | null;
   success: boolean;
   error_message: string | null;
+  relevance_score: number | null;
   created_at: string;
 }
 

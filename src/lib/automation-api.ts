@@ -26,13 +26,20 @@ interface TriggerRunResponse {
   run_at: string;
 }
 
-const DEMO_TARGETS = [
+const DEMO_TARGETS: {
+  action: string;
+  target: string;
+  success?: boolean;
+  relevanceScore?: number;
+}[] = [
   { action: "like", target: "@techcrunch" },
   { action: "like", target: "#artificialintelligence" },
   { action: "follow", target: "@startupinsider" },
+  { action: "skip", target: "#machinelearning", success: false, relevanceScore: 23 },
   { action: "like", target: "@nasa" },
-  { action: "browse", target: "#machinelearning" },
+  { action: "error", target: "@unknown_user", success: false },
   { action: "like", target: "@openai" },
+  { action: "follow", target: "@startupdaily" },
 ];
 
 export async function triggerRunNow(userId: string): Promise<TriggerRunResponse> {
@@ -46,7 +53,8 @@ export async function triggerRunNow(userId: string): Promise<TriggerRunResponse>
           userId,
           action: item.action,
           target: item.target,
-          success: Math.random() > 0.1,
+          success: item.success ?? Math.random() > 0.1,
+          relevanceScore: item.relevanceScore ?? Math.floor(Math.random() * 100),
         });
       } catch {
         /* ignore — log table may not exist in some envs */

@@ -88,6 +88,25 @@ function buildStorage(): AuthStorage {
   };
 }
 
+/**
+ * Wraps the global fetch with a 15-second timeout so auth / data requests
+ * never hang indefinitely. The timeout applies to *every* Supabase call
+ * made through this client.
+ */
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetch(input, { ...init, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 // Typed loosely here for simplicity; all calls go through src/lib/db.ts which
 // narrows rows to our database types in src/types/database.ts.
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -97,4 +116,5 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: false,
   },
+  global: { fetch: fetchWithTimeout },
 });

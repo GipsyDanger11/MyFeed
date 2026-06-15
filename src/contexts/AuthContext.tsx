@@ -14,6 +14,8 @@ import {
   useState,
 } from "react";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import { supabase } from "@/lib/supabase";
 import type { Profile } from "@/types/database";
 
@@ -153,7 +155,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    // Prevent auto-refresh from re-reading the stale session from storage.
+    supabase.auth.stopAutoRefresh();
+
+    // Clear local state immediately so layouts redirect right away.
+    setSession(null);
+    setProfile(null);
+
+    // Wipe all Supabase auth keys from AsyncStorage BEFORE calling
+    // signOut().  signOut() internally calls __loadSession() which
+    // reads from storage — if the token is expired it will *refresh*
+    // the token, emit SIGNED_IN, and restore the session via the
+    // onAuthStateChange listener, defeating sign-out.
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const supabaseKeys = keys.filter(
+        (k) =>
+          k.startsWith("supabase.auth.token") || k.startsWith("sb-"),
+      );
+      if (supabaseKeys.length > 0) {
+        await AsyncStorage.removeMany(supabaseKeys);
+      }
+    } catch {
+      // Storage may not be available; proceed anyway.
+    }
+
+    // Best-effort server-side sign-out.  With storage already empty
+    // the internal __loadSession → _callRefreshToken path is a no-op.
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
   }, []);
 
   const value = useMemo<AuthContextValue>(

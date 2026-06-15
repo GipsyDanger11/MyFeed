@@ -89,6 +89,7 @@ export default function SignupScreen() {
           },
           { onConflict: "id", ignoreDuplicates: true },
         );
+        setStatus({ kind: "idle" });
         // index.tsx redirects based on auth + onboarded state.
       }
     } catch (e: unknown) {
@@ -135,6 +136,8 @@ export default function SignupScreen() {
     setStatus({ kind: "loading" });
     try {
       await signInWithGoogle();
+      // index.tsx will redirect; reset in case it doesn't
+      setStatus({ kind: "idle" });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Unknown error";
       setStatus({ kind: "error", message: msg });

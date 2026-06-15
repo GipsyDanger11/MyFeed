@@ -50,6 +50,7 @@ import {
     getInstagramConnection,
     setAutomationPaused,
 } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import type { InstagramConnection } from "@/types/database";
 
 export default function SettingsScreen() {
@@ -107,7 +108,14 @@ export default function SettingsScreen() {
   function onSignOut() {
     Alert.alert("Sign out?", "You can sign back in any time.", [
       { text: "Cancel", style: "cancel" },
-      { text: "Sign out", style: "destructive", onPress: () => void signOut() },
+      {
+        text: "Sign out",
+        style: "destructive",
+        onPress: () => {
+          signOut();
+          router.replace("/login");
+        },
+      },
     ]);
   }
 
@@ -293,29 +301,16 @@ export default function SettingsScreen() {
         </Section>
 
         {/* SIGN OUT */}
-        <View style={styles.signOutWrap}>
-          <LinearGradient
-            colors={["rgba(239,68,68,0.55)", "rgba(239,68,68,0.15)"] as unknown as readonly [
-              string,
-              string,
-              ...string[]
-            ]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.signOutGradient}
-          >
-            <Pressable
-              onPress={onSignOut}
-              style={({ pressed }) => [
-                styles.signOutInner,
-                { opacity: pressed ? 0.7 : 1 },
-              ]}
-            >
-              <Text style={styles.signOutIcon}>⎋</Text>
-              <Text style={styles.signOutText}>Sign out</Text>
-            </Pressable>
-          </LinearGradient>
-        </View>
+        <Pressable
+          onPress={onSignOut}
+          style={({ pressed }) => [
+            styles.signOutInner,
+            { opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <Text style={styles.signOutIcon}>⎋</Text>
+          <Text style={styles.signOutText}>Sign out</Text>
+        </Pressable>
 
         <Text
           style={[
