@@ -6,16 +6,16 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { ReactNode } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TextInputProps,
-    TouchableOpacity,
-    View,
-    ViewStyle,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TextInputProps,
+  TouchableOpacity,
+  View,
+  ViewStyle,
 } from "react-native";
 
 import { GlassCard, GradientBackground, GradientButton, GradientText } from "@/components/glass";

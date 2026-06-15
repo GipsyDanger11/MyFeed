@@ -2,9 +2,23 @@
 Environment-driven configuration for the MyFeed automation worker.
 
 Reads once on import. Fail loudly if the secrets we need are missing.
+
+If `automation/.env` exists, it is loaded automatically (python-dotenv),
+so local dev works without exporting vars in your shell.
 """
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv  # type: ignore
+
+    # Look for automation/.env two levels up from this file's parent.
+    _env_path = Path(__file__).resolve().parent / ".env"
+    if _env_path.exists():
+        load_dotenv(_env_path, override=False)
+except ImportError:  # python-dotenv is optional
+    pass
 
 
 def _required(name: str) -> str:

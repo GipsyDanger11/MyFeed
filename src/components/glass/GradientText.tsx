@@ -2,9 +2,9 @@
  * GradientText — text filled with a horizontal/vertical linear gradient.
  * Uses expo-linear-gradient + mask for crisp gradient text.
  */
-import MaskedView from "@react-native-masked-view/masked-view";
 import { LinearGradient } from "expo-linear-gradient";
 import { StyleProp, StyleSheet, Text, TextStyle } from "react-native";
+import MaskedView from "@react-native-masked-view/masked-view";
 
 interface GradientTextProps {
   text: string;

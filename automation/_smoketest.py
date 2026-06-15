@@ -7,12 +7,10 @@ os.environ.setdefault("SUPABASE_URL", "https://test.supabase.co")
 os.environ.setdefault("SUPABASE_SERVICE_KEY", "test-key")
 os.environ.setdefault("ENCRYPTION_KEY", "test-key-12345")
 
-# Mock instagrapi
-class _Stub:
-    pass
-
-sys.modules.setdefault("instagrapi", _Stub())
-sys.modules.setdefault("instagrapi.exceptions", _Stub())
+# instagrapi is installed locally now — no need to mock it. If for some
+# reason the import is missing on this machine, we still want the
+# wrapper module to load, so the try/except inside it is the real
+# source of truth.
 
 from automation import config  # noqa: E402
 print(f"[ok] config: port={config.SETTINGS.port} interval={config.SETTINGS.worker_interval_seconds}s")

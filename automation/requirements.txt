@@ -1,12 +1,12 @@
 # MyFeed automation worker dependencies
-fastapi==0.115.0
-uvicorn[standard]==0.32.0
-pydantic==2.9.2
-supabase==2.8.1
-cryptography==43.0.1
-
-# instagrapi (Python 3.11+ recommended)
-instagrapi==2.1.3
-
-# optional: dotenv for local .env files
-python-dotenv==1.0.1
+# Pinned loosely to avoid the instagrapi/pydantic/fastapi version war.
+# NOTE: we talk to postgrest-py directly (not supabase-py) because the
+# latest supabase-py has a double-/rest/v1/ URL bug.
+fastapi>=0.115.0,<0.120
+uvicorn[standard]>=0.32.0,<0.40
+pydantic>=2.10.1,<3
+postgrest>=2.17.0,<3
+httpx>=0.27,<0.29
+cryptography>=43.0.1,<46
+instagrapi>=2.1.3
+python-dotenv>=1.0.1
