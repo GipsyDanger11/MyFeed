@@ -4,12 +4,17 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo/ui": "~56.0.17",
+    "@react-native-async-storage/async-storage": "^3.1.1",
+    "@react-native-masked-view/masked-view": "0.3.2",
+    "@supabase/supabase-js": "^2.108.2",
+    "crypto-js": "^4.2.0",
     "expo": "~56.0.11",
     "expo-constants": "~56.0.18",
     "expo-device": "~56.0.4",
     "expo-font": "~56.0.6",
     "expo-glass-effect": "~56.0.4",
     "expo-image": "~56.0.11",
+    "expo-linear-gradient": "^56.0.4",
     "expo-linking": "~56.0.14",
     "expo-router": "~56.2.10",
     "expo-splash-screen": "~56.0.10",
@@ -17,6 +22,7 @@
     "expo-symbols": "~56.0.6",
     "expo-system-ui": "~56.0.5",
     "expo-web-browser": "~56.0.5",
+    "nativewind": "^4.2.5",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
@@ -24,11 +30,14 @@
     "react-native-reanimated": "4.3.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.25.2",
+    "react-native-url-polyfill": "^3.0.0",
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.8.3"
   },
   "devDependencies": {
+    "@types/crypto-js": "^4.2.2",
     "@types/react": "~19.2.2",
+    "tailwindcss": "^3.4.19",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -37,7 +46,12 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
+    "build:android": "eas build --platform android --profile preview --non-interactive",
+    "build:ios": "eas build --platform ios --non-interactive",
+    "worker:install": "cd automation && python -m venv .venv && .venv/bin/pip install -r requirements.txt",
+    "worker:run": "cd automation && .venv/bin/uvicorn automation.app:app --reload --port 8000"
   },
   "private": true
 }
