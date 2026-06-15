@@ -13,6 +13,8 @@ interface StatusPillProps {
   label: string;
   variant: Variant;
   dot?: boolean;
+  /** When true, render a white-on-translucent style for dark/gradient backgrounds. */
+  invert?: boolean;
   style?: ViewStyle;
 }
 
@@ -24,12 +26,15 @@ const colorMap = {
   neutral: { fg: Colors.textMuted, bg: Colors.surfaceStrong },
 } as const;
 
-export function StatusPill({ label, variant, dot = true, style }: StatusPillProps) {
+export function StatusPill({ label, variant, dot = true, invert, style }: StatusPillProps) {
   const c = colorMap[variant];
+  const bg = invert ? "rgba(255,255,255,0.14)" : c.bg;
+  const fg = invert ? "#fff" : c.fg;
+  const dotColor = invert ? (variant === "warning" ? Colors.warning : Colors.success) : c.fg;
   return (
-    <View style={[styles.pill, { backgroundColor: c.bg }, style]}>
-      {dot && <View style={[styles.dot, { backgroundColor: c.fg }]} />}
-      <Text style={[Typography.caption, { color: c.fg, fontWeight: "700" }]}>{label}</Text>
+    <View style={[styles.pill, { backgroundColor: bg }, style]}>
+      {dot && <View style={[styles.dot, { backgroundColor: dotColor }]} />}
+      <Text style={[Typography.caption, { color: fg, fontWeight: "700" }]}>{label}</Text>
     </View>
   );
 }
@@ -47,6 +52,6 @@ const styles = StyleSheet.create({
   dot: {
     width: 6,
     height: 6,
-    borderRadius: 9999,
+    borderRadius: Radius.full,
   },
 });

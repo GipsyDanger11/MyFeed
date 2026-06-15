@@ -5,13 +5,13 @@
  */
 import { supabase } from "@/lib/supabase";
 import type {
-  AutomationLog,
-  InstagramConnection,
-  InstagramStatus,
-  Preference,
-  Profile,
-  ProfileInsert,
-  TopicDirection,
+    AutomationLog,
+    InstagramConnection,
+    InstagramStatus,
+    Preference,
+    Profile,
+    ProfileInsert,
+    TopicDirection,
 } from "@/types/database";
 
 // --- profiles --------------------------------------------------------------
@@ -172,4 +172,26 @@ export async function countActionsToday(userId: string): Promise<number> {
     .gte("created_at", startOfDay.toISOString());
   if (error) throw error;
   return count ?? 0;
+}
+
+export async function insertAutomationLog(input: {
+  userId: string;
+  action: string;
+  target?: string | null;
+  success?: boolean;
+  errorMessage?: string | null;
+}): Promise<AutomationLog> {
+  const { data, error } = await supabase
+    .from("automation_logs")
+    .insert({
+      user_id: input.userId,
+      action: input.action,
+      target: input.target ?? null,
+      success: input.success ?? true,
+      error_message: input.errorMessage ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }

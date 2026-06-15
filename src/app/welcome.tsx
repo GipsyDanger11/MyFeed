@@ -62,7 +62,7 @@ export default function OnboardingIntro() {
           ))}
         </View>
 
-        <GradientButton label="Get started" onPress={() => router.push("/preferences")} />
+        <GradientButton label="Get started" onPress={() => router.push("/pick-topics")} />
       </View>
     </GradientBackground>
   );

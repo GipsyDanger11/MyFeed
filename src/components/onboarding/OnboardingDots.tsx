@@ -5,6 +5,7 @@
 import { StyleSheet, View } from "react-native";
 
 import { Colors, Gradients } from "@/constants/colors";
+import { Radius } from "@/constants/spacing";
 
 interface OnboardingDotsProps {
   total: number;
@@ -33,12 +34,14 @@ const styles = StyleSheet.create({
   dot: {
     width: 8,
     height: 8,
-    borderRadius: 9999,
+    borderRadius: Radius.sm,
     backgroundColor: Colors.border,
   },
   past: { backgroundColor: Colors.purpleSoft },
   active: {
     width: 28,
+    height: 6,
+    borderRadius: Radius.full,
     backgroundColor: Gradients.primary[0] as string,
   },
 });

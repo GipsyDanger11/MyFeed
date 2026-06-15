@@ -10,8 +10,7 @@ export default function OnboardingLayout() {
         gestureEnabled: false,
       }}
     >
-      <Stack.Screen name="index" />
-      <Stack.Screen name="preferences" />
+      <Stack.Screen name="pick-topics" />
       <Stack.Screen name="connect-instagram" />
       <Stack.Screen name="complete" />
     </Stack>

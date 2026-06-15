@@ -10,8 +10,8 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { GradientBackground } from "@/components/glass";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Colors } from "@/constants/colors";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
 import "@/global.css";
 
@@ -35,6 +35,7 @@ function Boot() {
       }}
     >
       <Stack.Screen name="index" />
+      <Stack.Screen name="welcome" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(onboarding)" options={{ gestureEnabled: false }} />
       <Stack.Screen name="(app)" options={{ gestureEnabled: false }} />

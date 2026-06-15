@@ -29,6 +29,8 @@ interface GradientButtonProps {
   style?: ViewStyle;
   textStyle?: TextStyle;
   size?: "md" | "lg";
+  /** Corner radius override. Defaults to Radius.xl. */
+  radius?: number;
 }
 
 export function GradientButton({
@@ -42,6 +44,7 @@ export function GradientButton({
   style,
   textStyle,
   size = "lg",
+  radius = Radius.xl,
 }: GradientButtonProps) {
   const isPrimary = variant === "primary";
   const isDanger = variant === "danger";
@@ -57,36 +60,38 @@ export function GradientButton({
       disabled={inactive}
       style={({ pressed }) => [
         styles.wrapper,
+        { borderRadius: radius },
         fullWidth && { alignSelf: "stretch" },
         { height, opacity: inactive ? 0.55 : pressed ? 0.9 : 1 },
         isPrimary && Shadow.glow,
         style,
       ]}
-    >
-      {isPrimary && (
+    ><>
+      {isPrimary ? (
         <LinearGradient
           colors={Gradients.primary as unknown as readonly [string, string, ...string[]]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.fill, { borderRadius: Radius.xl }]}
+          style={[styles.fill, { borderRadius: radius }]}
         />
-      )}
-      {isDanger && (
+      ) : null}
+      {isDanger ? (
         <LinearGradient
           colors={["#EF4444", "#B91C1C"] as unknown as readonly [string, string, ...string[]]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.fill, { borderRadius: Radius.xl }]}
+          style={[styles.fill, { borderRadius: radius }]}
         />
-      )}
-      {isGhost && (
+      ) : null}
+      {isGhost ? (
         <View
           style={[
             styles.fill,
-            { backgroundColor: Colors.surfaceStrong, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.borderStrong },
+            { backgroundColor: Colors.surfaceStrong, borderRadius: radius, borderWidth: 1, borderColor: Colors.borderStrong },
           ]}
         />
-      )}      <View style={styles.contentRow}>
+      ) : null}
+      <View style={styles.contentRow}>
         {loading ? (
           <ActivityIndicator color={Colors.text} />
         ) : (
@@ -104,7 +109,7 @@ export function GradientButton({
           </>
         )}
       </View>
-    </Pressable>
+    </></Pressable>
   );
 }
 

@@ -10,8 +10,8 @@ import { Redirect } from "expo-router";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { GradientBackground } from "@/components/glass";
-import { useAuth } from "@/contexts/AuthContext";
 import { Colors } from "@/constants/colors";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Index() {
   const { session, profile, ready } = useAuth();
@@ -31,7 +31,7 @@ export default function Index() {
   }
 
   if (!profile?.onboarded_at) {
-    return <Redirect href="/onboarding" />;
+    return <Redirect href="/welcome" />;
   }
 
   return <Redirect href="/dashboard" />;

@@ -1,10 +1,10 @@
 /**
  * GradientText — text filled with a horizontal/vertical linear gradient.
- * Uses expo-linear-gradient + mask for crisp gradient text.
+ * Uses expo-linear-gradient + mask on native. On web, falls back to a
+ * solid color (because MaskedView doesn't render in the browser).
  */
 import { LinearGradient } from "expo-linear-gradient";
-import { StyleProp, StyleSheet, Text, TextStyle } from "react-native";
-import MaskedView from "@react-native-masked-view/masked-view";
+import { Platform, StyleProp, StyleSheet, Text, TextStyle } from "react-native";
 
 interface GradientTextProps {
   text: string;
@@ -14,6 +14,20 @@ interface GradientTextProps {
 
 export function GradientText({ text, colors, style }: GradientTextProps) {
   const flatStyle = StyleSheet.flatten(style) as TextStyle;
+
+  // Web fallback: MaskedView doesn't render. Use solid first color
+  // (still looks good against the dark background).
+  if (Platform.OS === "web") {
+    return (
+      <Text style={[flatStyle, { color: colors[0] }]} numberOfLines={1}>
+        {text}
+      </Text>
+    );
+  }
+
+  // Native: real gradient via mask.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const MaskedView = require("@react-native-masked-view/masked-view").default;
   return (
     <MaskedView
       maskElement={
@@ -27,15 +41,6 @@ export function GradientText({ text, colors, style }: GradientTextProps) {
       </LinearGradient>
     </MaskedView>
   );
-}
-
-// Stub fallback if MaskedView is not yet installed.
-export function GradientTextSafe(props: GradientTextProps & { fallbackTextStyle?: TextStyle }) {
-  try {
-    return <GradientText {...props} />;
-  } catch {
-    return <Text style={[props.style as TextStyle, props.fallbackTextStyle]}>{props.text}</Text>;
-  }
 }
 
 const styles = StyleSheet.create({});

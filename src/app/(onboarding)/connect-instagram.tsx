@@ -10,30 +10,30 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  GlassCard,
-  GradientBackground,
-  GradientButton,
-  GradientText,
-  StatusPill,
+    GlassCard,
+    GradientBackground,
+    GradientButton,
+    GradientText,
+    StatusPill,
 } from "@/components/glass";
 import { OnboardingDots } from "@/components/onboarding/OnboardingDots";
 import { Colors, Gradients } from "@/constants/colors";
 import { Radius, Spacing } from "@/constants/spacing";
 import { Typography } from "@/constants/typography";
 import { useAuth } from "@/contexts/AuthContext";
-import { encryptSession } from "@/lib/encryption";
 import { upsertInstagramConnection } from "@/lib/db";
+import { encryptSession } from "@/lib/encryption";
 
 export default function ConnectInstagramScreen() {
   const router = useRouter();
@@ -58,23 +58,34 @@ export default function ConnectInstagramScreen() {
     setError(undefined);
     setStatus("connecting");
     try {
-      // Call the Python worker to perform the Instagram login. The worker
-      // returns an encrypted session blob we can store in Supabase.
-      const res = await fetch("/api/connect-instagram", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id, username, password }),
-      });
-      if (!res.ok) {
-        throw new Error(`Connection failed: ${res.status}`);
+      // In production, this calls the Python worker which logs in via
+      // instagrapi and returns an encrypted session. For the hackathon
+      // demo we skip the network call and synthesize a session blob so
+      // the full onboarding flow can be walked end-to-end.
+      const useDemoSession = process.env.EXPO_PUBLIC_DEMO_MODE !== "false";
+      let encryptedSession: string;
+      if (useDemoSession) {
+        // Tiny deterministic placeholder — real value is a base64 session
+        // blob encrypted with ENCRYPTION_KEY.
+        encryptedSession = encryptSession(
+          JSON.stringify({ demo: true, username, ts: Date.now() }),
+        );
+      } else {
+        const res = await fetch("/api/connect-instagram", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: user.id, username, password }),
+        });
+        if (!res.ok) {
+          throw new Error(`Connection failed: ${res.status}`);
+        }
+        const data = (await res.json()) as { encrypted_session: string };
+        encryptedSession = encryptSession(data.encrypted_session);
       }
-      const data = (await res.json()) as { encrypted_session: string };
-      // Defence in depth: also encrypt on the client before persisting.
-      const doubleEncrypted = encryptSession(data.encrypted_session);
       await upsertInstagramConnection({
         userId: user.id,
         username,
-        encryptedSession: doubleEncrypted,
+        encryptedSession,
         status: "connected",
       });
       setStatus("connected");

@@ -6,21 +6,21 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { ReactNode } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TextInputProps,
-  TouchableOpacity,
-  View,
-  ViewStyle,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TextInputProps,
+    TouchableOpacity,
+    View,
+    ViewStyle,
 } from "react-native";
 
 import { GlassCard, GradientBackground, GradientButton, GradientText } from "@/components/glass";
 import { Colors, Gradients } from "@/constants/colors";
-import { Radius, Spacing } from "@/constants/spacing";
+import { Spacing } from "@/constants/spacing";
 import { Typography } from "@/constants/typography";
 
 interface AuthFormProps {
@@ -95,7 +95,7 @@ export function AuthForm({
             ) : null}
           </View>
 
-          <GlassCard padding={6} radius="2xl" style={styles.card}>
+          <GlassCard padding={6} radius="none" style={styles.card}>
             {children}
             <View style={{ height: Spacing[4] }} />
             <GradientButton
@@ -103,6 +103,7 @@ export function AuthForm({
               onPress={onSubmit}
               loading={loading}
               variant="primary"
+              radius={0}
             />
             <View style={styles.divider}>
               <View style={styles.dividerLine} />
@@ -114,6 +115,7 @@ export function AuthForm({
               onPress={onGoogle}
               variant="ghost"
               icon={<Text style={{ fontSize: 18 }}>G</Text>}
+              radius={0}
             />
           </GlassCard>
 
@@ -177,7 +179,7 @@ const styles = StyleSheet.create({
   logoMark: {
     width: 64,
     height: 64,
-    borderRadius: Radius["2xl"],
+    borderRadius: 0,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -203,7 +205,7 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: Radius.lg,
+    borderRadius: 0,
     borderWidth: 1,
     borderColor: Colors.border,
     color: Colors.text,

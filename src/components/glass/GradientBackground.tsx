@@ -8,6 +8,7 @@ import { StyleSheet, View, ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors, Gradients } from "@/constants/colors";
+import { Radius } from "@/constants/spacing";
 
 interface GradientBackgroundProps {
   children: React.ReactNode;
@@ -25,9 +26,9 @@ export function GradientBackground({ children, style }: GradientBackgroundProps)
         style={StyleSheet.absoluteFill}
       />
       {/* Ambient blobs */}
-      <View pointerEvents="none" style={[styles.blob, { top: -80, left: -60, width: 320, height: 320, backgroundColor: Gradients.blob1[0] as string }]} />
-      <View pointerEvents="none" style={[styles.blob, { top: 120, right: -100, width: 360, height: 360, backgroundColor: Gradients.blob2[0] as string }]} />
-      <View pointerEvents="none" style={[styles.blob, { bottom: -80, left: 60, width: 300, height: 300, backgroundColor: Gradients.blob3[0] as string }]} />
+      <View style={[styles.blob, { top: -80, left: -60, width: 320, height: 320, backgroundColor: Gradients.blob1[0] as string, pointerEvents: "none" }]} />
+      <View style={[styles.blob, { top: 120, right: -100, width: 360, height: 360, backgroundColor: Gradients.blob2[0] as string, pointerEvents: "none" }]} />
+      <View style={[styles.blob, { bottom: -80, left: 60, width: 300, height: 300, backgroundColor: Gradients.blob3[0] as string, pointerEvents: "none" }]} />
       <View style={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>{children}</View>
     </View>
   );
@@ -38,7 +39,7 @@ const styles = StyleSheet.create({
   content: { flex: 1 },
   blob: {
     position: "absolute",
-    borderRadius: 9999,
+    borderRadius: Radius.blob,
     opacity: 0.55,
   },
 });

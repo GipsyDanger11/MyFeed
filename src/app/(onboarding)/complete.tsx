@@ -10,14 +10,14 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  GlassCard,
-  GradientBackground,
-  GradientButton,
-  GradientText,
+    GlassCard,
+    GradientBackground,
+    GradientButton,
+    GradientText,
 } from "@/components/glass";
 import { OnboardingDots } from "@/components/onboarding/OnboardingDots";
 import { Colors, Gradients } from "@/constants/colors";
-import { Radius, Spacing } from "@/constants/spacing";
+import { Spacing } from "@/constants/spacing";
 import { Typography } from "@/constants/typography";
 import { useAuth } from "@/contexts/AuthContext";
 import { markOnboarded, replacePreferences } from "@/lib/db";
@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   checkmark: {
     width: 96,
     height: 96,
-    borderRadius: 9999,
+    borderRadius: 4,
     alignItems: "center",
     justifyContent: "center",
   },

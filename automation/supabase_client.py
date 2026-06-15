@@ -136,6 +136,7 @@ def log_action(
     target: str | None = None,
     success: bool = True,
     error: str | None = None,
+    relevance_score: int | None = None,
 ) -> None:
     _client().from_("automation_logs").insert(
         {
@@ -144,6 +145,7 @@ def log_action(
             "target": target,
             "success": success,
             "error_message": error,
+            "relevance_score": relevance_score,
         }
     ).execute()
 

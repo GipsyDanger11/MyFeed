@@ -1,22 +1,17 @@
-/**
- * Edit preferences (post-onboarding) — reuses the chip layout from onboarding.
- * Loads the current selection from Supabase, lets the user change it, and saves.
- */
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   Chip,
-  GlassCard,
   GradientBackground,
-  GradientButton,
-  ScreenHeader,
+  GradientText,
   StatusPill,
 } from "@/components/glass";
-import { Colors } from "@/constants/colors";
-import { Spacing } from "@/constants/spacing";
+import { Colors, Gradients } from "@/constants/colors";
+import { Radius, Spacing } from "@/constants/spacing";
 import { Typography } from "@/constants/typography";
 import { useAuth } from "@/contexts/AuthContext";
 import { getPreferences, replacePreferences } from "@/lib/db";
@@ -95,65 +90,149 @@ export default function PreferencesEditScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <ScreenHeader
-          title="Preferences"
-          subtitle="Tap to boost, tap again to reduce."
-        />
+        {/* HERO HEADER */}
+        <View style={styles.header}>
+          <Text style={[Typography.caption, { color: Colors.textMuted, letterSpacing: 2 }]}>
+            PREFERENCES
+          </Text>
+          <GradientText
+            text="Tap to boost, tap again to reduce."
+            colors={Gradients.primary as unknown as readonly [string, string, ...string[]]}
+            style={[Typography.h1, { fontSize: 32, lineHeight: 36, marginTop: 2 }]}
+          />
+        </View>
+
         <View style={styles.summary}>
           <StatusPill label={`${boostCount} boost`} variant="success" />
           <StatusPill label={`${reduceCount} reduce`} variant="danger" />
         </View>
 
-        <GlassCard padding={5} radius="2xl">
-          <Text style={[Typography.h3, { color: Colors.text, marginBottom: Spacing[3] }]}>
-            🌱 Topics to boost
-          </Text>
-          <View style={styles.chipRow}>
-            {TOPICS.map((t) => (
-              <Chip
-                key={`b-${t.id}`}
-                label={t.label}
-                emoji={t.emoji}
-                selected={selection[t.id] === "boost"}
-                variant="boost"
-                onPress={() => setTopic(t.id, "boost")}
-              />
-            ))}
+        {/* BOOST */}
+        <View style={{ gap: Spacing[3] }}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionIcon}>
+              <Text style={{ fontSize: 14 }}>🌱</Text>
+            </View>
+            <Text style={[Typography.smallBold, { color: Colors.text, letterSpacing: 0.4 }]}>
+              Topics to boost
+            </Text>
           </View>
-        </GlassCard>
-
-        <GlassCard padding={5} radius="2xl">
-          <Text style={[Typography.h3, { color: Colors.text, marginBottom: Spacing[3] }]}>
-            🚫 Topics to reduce
-          </Text>
-          <View style={styles.chipRow}>
-            {TOPICS.map((t) => (
-              <Chip
-                key={`r-${t.id}`}
-                label={t.label}
-                emoji={t.emoji}
-                selected={selection[t.id] === "reduce"}
-                variant="reduce"
-                onPress={() => setTopic(t.id, "reduce")}
-              />
-            ))}
+          <View style={styles.sectionCard}>
+            <View style={styles.chipSection}>
+              <View style={styles.chipRow}>
+                {TOPICS.map((t) => (
+                  <Chip
+                    key={`b-${t.id}`}
+                    label={t.label}
+                    emoji={t.emoji}
+                    selected={selection[t.id] === "boost"}
+                    variant="boost"
+                    onPress={() => setTopic(t.id, "boost")}
+                  />
+                ))}
+              </View>
+            </View>
           </View>
-        </GlassCard>
+        </View>
 
-        <GradientButton
-          label={saving ? "Saving..." : "Save preferences"}
+        {/* REDUCE */}
+        <View style={{ gap: Spacing[3] }}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionIcon}>
+              <Text style={{ fontSize: 14 }}>🚫</Text>
+            </View>
+            <Text style={[Typography.smallBold, { color: Colors.text, letterSpacing: 0.4 }]}>
+              Topics to reduce
+            </Text>
+          </View>
+          <View style={styles.sectionCard}>
+            <View style={styles.chipSection}>
+              <View style={styles.chipRow}>
+                {TOPICS.map((t) => (
+                  <Chip
+                    key={`r-${t.id}`}
+                    label={t.label}
+                    emoji={t.emoji}
+                    selected={selection[t.id] === "reduce"}
+                    variant="reduce"
+                    onPress={() => setTopic(t.id, "reduce")}
+                  />
+                ))}
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* SAVE */}
+        <Pressable
           onPress={save}
-          loading={saving}
-          disabled={boostCount === 0}
-        />
+          disabled={saving || boostCount === 0}
+          style={({ pressed }) => [
+            styles.saveWrap,
+            { opacity: saving || boostCount === 0 ? 0.5 : pressed ? 0.9 : 1 },
+          ]}
+        >
+          <LinearGradient
+            colors={Gradients.primary as unknown as readonly [string, string, ...string[]]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.saveGradient}
+          >
+            {saving ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.saveText}>Save preferences</Text>
+            )}
+          </LinearGradient>
+        </Pressable>
       </ScrollView>
     </GradientBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: Spacing[6], gap: Spacing[4] },
+  scroll: { paddingHorizontal: Spacing[5], gap: Spacing[6] },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  summary: { flexDirection: "row", gap: Spacing[2] },
+  header: { gap: Spacing[1], paddingHorizontal: Spacing[1] },
+  summary: { flexDirection: "row", gap: Spacing[2], paddingHorizontal: Spacing[2] },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing[3],
+    paddingHorizontal: Spacing[2],
+  },
+  sectionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius["2xl"],
+    backgroundColor: Colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  sectionCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius["5xl"],
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: "hidden",
+  },
+  chipSection: { padding: Spacing[4] },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: Spacing[2] },
+  saveWrap: {
+    borderRadius: Radius["5xl"],
+    overflow: "hidden",
+  },
+  saveGradient: {
+    paddingVertical: Spacing[4],
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
 });

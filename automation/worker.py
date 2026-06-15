@@ -21,6 +21,7 @@ import random
 import time
 from typing import Any
 
+from . import groq_client
 from . import instagrapi_client as ig
 from . import supabase_client as db
 from .config import SETTINGS
@@ -94,8 +95,22 @@ def run_for_user(user_id: str) -> dict[str, Any]:
 
     db.set_status(user_id, "connecting")
 
-    # 6. Per-hashtag plan
-    hashtags = random.sample(boost, k=len(boost))
+    # 6. Per-hashtag plan — Feature 1: AI-expanded hashtags
+    # The user gave us a short list of boost topics. Groq widens that to
+    # a long list of relevant Instagram hashtags so the worker has more
+    # surface to act on. Falls back to a hardcoded map if Groq is down.
+    expanded = groq_client.generate_hashtags(boost)
+    # Flatten into a single list of unique hashtags.
+    hashtag_pool: list[str] = []
+    for topic, tags in expanded.items():
+        for t in tags:
+            tag = t.lstrip("#").strip()
+            if tag and tag not in hashtag_pool:
+                hashtag_pool.append(tag)
+    if not hashtag_pool:
+        # No AI, no fallback map match — use the topics as raw hashtags.
+        hashtag_pool = [t.lower().replace(" ", "") for t in boost]
+    hashtags = random.sample(hashtag_pool, k=min(len(hashtag_pool), 6))
     planned_actions = min(
         likes_remaining + follows_remaining,
         6,  # hard cap per run
@@ -107,7 +122,7 @@ def run_for_user(user_id: str) -> dict[str, Any]:
             if likes_remaining <= 0 and follows_remaining <= 0:
                 break
 
-            # 6a. Browse the feed (pure signal, no quota)
+            # 6a. Browse the feed (pure signal, no quota, no scoring needed)
             if ig.browse_hashtag(cl, hashtag):
                 db.log_action(user_id, "browse", target=f"#{hashtag}", success=True)
                 summary["actions_completed"] += 1
@@ -119,16 +134,42 @@ def run_for_user(user_id: str) -> dict[str, Any]:
                 summary["actions_failed"] += 1
             _human_delay()
 
-            # 6b. Likes
+            # 6b. Likes — Feature 2: score each post caption with Groq
             if likes_remaining > 0:
                 like_target = min(3, likes_remaining)
-                liked = ig.like_top_posts(cl, hashtag, amount=like_target)
-                for tgt in liked:
-                    db.log_action(user_id, "like", target=tgt, success=True)
-                    summary["actions_completed"] += 1
-                if liked:
-                    likes_remaining -= len(liked)
-                    _human_delay()
+                # Pull top posts and score each before liking.
+                try:
+                    candidates = cl.hashtag_medias_top(hashtag, amount=like_target)
+                except (ChallengeRequired, FeedbackRequired, RateLimitError, PleaseWaitFewMinutes) as exc:
+                    log.warning("Like blocked for #%s: %s", hashtag, exc)
+                    raise
+                for m in candidates:
+                    if likes_remaining <= 0:
+                        break
+                    caption = (getattr(m, "caption_text", "") or "").strip()
+                    score = groq_client.score_relevance(boost, caption)
+                    if not score["relevant"] or score["score"] < 60:
+                        db.log_action(
+                            user_id, "skip", target=f"#{hashtag}/{m.pk}",
+                            success=True, relevance_score=score["score"],
+                            error=f"low relevance: {score['reason']}",
+                        )
+                        log.info(
+                            "Skipping %s for #%s — score %d (%s)",
+                            m.pk, hashtag, score["score"], score["reason"],
+                        )
+                        continue
+                    try:
+                        if cl.media_like(m.pk):
+                            db.log_action(
+                                user_id, "like", target=f"#{hashtag}/{m.pk}",
+                                success=True, relevance_score=score["score"],
+                            )
+                            summary["actions_completed"] += 1
+                            likes_remaining -= 1
+                    except Exception as exc:  # noqa: BLE001
+                        log.warning("Failed to like %s: %s", m.pk, exc)
+                _human_delay()
 
             # 6c. Follows (0 or 1 per hashtag)
             if follows_remaining > 0 and random.random() < 0.5:
