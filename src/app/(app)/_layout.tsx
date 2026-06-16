@@ -35,6 +35,7 @@ export default function AppLayout() {
       <Stack.Screen name="settings" />
       <Stack.Screen name="preferences" options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="privacy" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="connect-instagram" options={{ animation: "slide_from_right" }} />
     </Stack>
   );
 }

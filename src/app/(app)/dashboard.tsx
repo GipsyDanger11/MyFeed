@@ -35,6 +35,7 @@ import {
   countActionType,
   countAllActions,
   getInstagramConnection,
+  getPreferences,
   getRecentLogs,
   setAutomationPaused,
 } from "@/lib/db";
@@ -158,8 +159,9 @@ export default function DashboardScreen() {
   // Realtime subscription
   useEffect(() => {
     if (!user?.id) return;
+    const channelName = `dashboard:${user.id}:${Date.now()}`;
     const channel = supabase
-      .channel(`dashboard:${user.id}`)
+      .channel(channelName)
       .on<AutomationLog>(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "automation_logs", filter: `user_id=eq.${user.id}` },
@@ -229,7 +231,9 @@ export default function DashboardScreen() {
     setTriggering(true);
     setToast(undefined);
     try {
-      const res = await triggerRunNow(user.id);
+      const prefs = await getPreferences(user.id);
+      const boostTopics = prefs.filter((p) => p.direction === "boost").map((p) => p.topic);
+      const res = await triggerRunNow(user.id, boostTopics);
       setToast({ kind: "success", message: `✓ ${res.actions_planned} actions queued` });
       await load();
     } catch (e: unknown) {

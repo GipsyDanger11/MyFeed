@@ -26,6 +26,11 @@ from . import instagrapi_client as ig
 from . import supabase_client as db
 from .config import SETTINGS
 
+ChallengeRequired = ig.ChallengeRequired
+FeedbackRequired = ig.FeedbackRequired
+RateLimitError = ig.RateLimitError
+PleaseWaitFewMinutes = ig.PleaseWaitFewMinutes
+
 log = logging.getLogger(__name__)
 
 
@@ -59,7 +64,6 @@ def run_for_user(user_id: str) -> dict[str, Any]:
     conn = db.get_connection(user_id)
     if not conn or not conn.get("encrypted_session"):
         summary["skipped"] = "no instagram connection"
-        db.set_status(user_id, "error", "No encrypted session on file.")
         return summary
     if conn.get("status") == "error":
         # Don't keep banging on a blocked account.
@@ -80,7 +84,7 @@ def run_for_user(user_id: str) -> dict[str, Any]:
         summary["skipped"] = "daily cap reached"
         return summary
 
-    # 5. Build client
+    # 5. Build client from saved session (reuse, not fresh login)
     try:
         settings_dict = ig.decrypt_session(conn["encrypted_session"])
         cl = ig.build_client(settings_dict)

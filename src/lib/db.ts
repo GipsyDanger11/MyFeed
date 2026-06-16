@@ -78,14 +78,35 @@ export async function replacePreferences(
   userId: string,
   topics: { topic: string; direction: TopicDirection }[],
 ): Promise<void> {
+  // Read existing topics first so we can restore them if the insert fails.
+  const { data: existing } = await supabase
+    .from("preferences")
+    .select("topic, direction")
+    .eq("user_id", userId);
+  const previous = existing ?? [];
+
   // Wipe and re-insert — simpler than diffing for a small list.
   const { error: delErr } = await supabase.from("preferences").delete().eq("user_id", userId);
-  if (delErr) throw delErr;
+  if (delErr) {
+    // If the delete fails we haven't lost anything.
+    throw delErr;
+  }
+
   if (topics.length === 0) return;
+
   const { error: insErr } = await supabase
     .from("preferences")
     .insert(topics.map((t) => ({ user_id: userId, topic: t.topic, direction: t.direction })));
-  if (insErr) throw insErr;
+  if (insErr) {
+    // Insert failed — restore the previous state so we don't
+    // silently lose the user's preferences.
+    try {
+      await supabase.from("preferences").insert(previous.map((p) => ({ user_id: userId, ...p })));
+    } catch {
+      // best-effort restore
+    }
+    throw insErr;
+  }
 }
 
 // --- instagram connections -------------------------------------------------

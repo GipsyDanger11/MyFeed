@@ -26,16 +26,25 @@ export default function PreferencesEditScreen() {
   const [selection, setSelection] = useState<Selection>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | undefined>();
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       if (!user?.id) return;
-      const prefs = await getPreferences(user.id);
-      const sel: Selection = {};
-      for (const p of prefs) sel[p.topic] = p.direction;
-      setSelection(sel);
-      setLoading(false);
+      try {
+        const prefs = await getPreferences(user.id);
+        if (cancelled) return;
+        const sel: Selection = {};
+        for (const p of prefs) sel[p.topic] = p.direction;
+        setSelection(sel);
+      } catch {
+        // preferences unavailable — show empty
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     })();
+    return () => { cancelled = true; };
   }, [user?.id]);
 
   const { boostCount, reduceCount } = useMemo(() => {
@@ -60,6 +69,7 @@ export default function PreferencesEditScreen() {
   async function save() {
     if (!user?.id) return;
     setSaving(true);
+    setSaveError(undefined);
     try {
       await replacePreferences(
         user.id,
@@ -68,7 +78,7 @@ export default function PreferencesEditScreen() {
       router.back();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to save preferences.";
-      Alert.alert("Error", msg);
+      setSaveError(msg);
     } finally {
       setSaving(false);
     }
@@ -166,6 +176,13 @@ export default function PreferencesEditScreen() {
           </View>
         </View>
 
+        {/* ERROR BANNER */}
+        {saveError ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>{saveError}</Text>
+          </View>
+        ) : null}
+
         {/* SAVE */}
         <Pressable
           onPress={save}
@@ -237,5 +254,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     letterSpacing: 0.3,
+  },
+  errorBanner: {
+    backgroundColor: "#dc2626",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  errorText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+    textAlign: "center",
   },
 });

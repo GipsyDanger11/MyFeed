@@ -53,6 +53,7 @@ class Settings:
     delay_max_seconds: int
     port: int
     log_level: str
+    proxy: str | None
 
 
 def load() -> Settings:
@@ -67,6 +68,7 @@ def load() -> Settings:
         delay_max_seconds=_int("DELAY_MAX_SECONDS", 30),
         port=_int("PORT", 8000),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
+        proxy=os.environ.get("INSTAGRAPI_PROXY") or None,
     )
 
 

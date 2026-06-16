@@ -26,12 +26,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    Alert,
     Pressable,
     ScrollView,
     StyleSheet,
     Switch,
     Text,
+    TouchableOpacity,
     View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -86,37 +86,22 @@ export default function SettingsScreen() {
     }
   }
 
-  function onDisconnectInstagram() {
-    Alert.alert(
-      "Disconnect Instagram?",
-      "This will stop automation. You can reconnect any time.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Disconnect",
-          style: "destructive",
-          onPress: async () => {
-            if (!user?.id) return;
-            await deleteInstagramConnection(user.id);
-            await load();
-          },
-        },
-      ],
-    );
+  async function onDisconnectInstagram() {
+    if (!user?.id) return;
+    try {
+      await deleteInstagramConnection(user.id);
+      await load();
+    } catch {
+      // Silently handle — connection state refreshes on next app open
+    }
   }
 
   function onSignOut() {
-    Alert.alert("Sign out?", "You can sign back in any time.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign out",
-        style: "destructive",
-        onPress: () => {
-          signOut();
-          router.replace("/login");
-        },
-      },
-    ]);
+    try {
+      signOut();
+    } catch {
+      // signOut is synchronous for the critical path
+    }
   }
 
   return (
@@ -301,16 +286,15 @@ export default function SettingsScreen() {
         </Section>
 
         {/* SIGN OUT */}
-        <Pressable
+        <TouchableOpacity
           onPress={onSignOut}
-          style={({ pressed }) => [
-            styles.signOutInner,
-            { opacity: pressed ? 0.7 : 1 },
-          ]}
+          activeOpacity={0.7}
         >
-          <Text style={styles.signOutIcon}>⎋</Text>
-          <Text style={styles.signOutText}>Sign out</Text>
-        </Pressable>
+          <View style={styles.signOutInner}>
+            <Text style={styles.signOutIcon}>⎋</Text>
+            <Text style={styles.signOutText}>Sign out</Text>
+          </View>
+        </TouchableOpacity>
 
         <Text
           style={[

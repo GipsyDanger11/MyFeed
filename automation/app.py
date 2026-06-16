@@ -23,13 +23,16 @@ WORKER_INTERVAL_SECONDS for free, even if the app never calls
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from typing import Any
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from . import crypto
 from . import instagrapi_client as ig
 from . import supabase_client as db
 from .config import SETTINGS
@@ -43,6 +46,14 @@ log = logging.getLogger("myfeed.automation")
 
 app = FastAPI(title="MyFeed Automation", version="1.0.0")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
 STARTED_AT = time.time()
 
 
@@ -52,6 +63,14 @@ class ConnectBody(BaseModel):
     user_id: str = Field(..., min_length=1)
     username: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
+
+
+class ImportSessionBody(BaseModel):
+    user_id: str = Field(..., min_length=1)
+    username: str = Field(..., min_length=1)
+    sessionid: str = Field(..., min_length=1)
+    ds_user_id: str = Field(..., min_length=1)
+    csrftoken: str = Field(default="")
 
 
 class RunNowBody(BaseModel):
@@ -75,14 +94,220 @@ async def connect_instagram(body: ConnectBody) -> dict[str, Any]:
     if not ig.is_available():
         raise HTTPException(status_code=503, detail="instagrapi not installed in this build")
     try:
-        cl, encrypted = ig.login(body.username, body.password)
-    except Exception as exc:  # noqa: BLE001
-        log.warning("Login failed for %s: %s", body.username, exc)
-        db.set_status(body.user_id, "error", f"Login failed: {exc}")
-        raise HTTPException(status_code=401, detail=f"Instagram login failed: {exc}")
+        result = await asyncio.wait_for(
+            asyncio.to_thread(ig.login_or_get_challenge, body.username, body.password),
+            timeout=120.0,
+        )
+    except asyncio.TimeoutError:
+        log.warning("Login timed out for %s", body.username)
+        db.set_status(body.user_id, "error", "Login timed out")
+        raise HTTPException(
+            status_code=408,
+            detail="Login took too long. Your Instagram may have sent a verification email — check it, then try again.",
+        )
+    except Exception as exc:
+        msg = str(exc)
+        log.warning("Login failed for %s: %s", body.username, msg)
+        db.set_status(body.user_id, "error", msg)
+        if "password" in msg.lower() or "invalid" in msg.lower():
+            detail = "Invalid username or password."
+        elif "blacklist" in msg.lower() or "ip" in msg.lower():
+            detail = "Instagram blocked this IP. Use a different network or wait a few hours."
+        elif "challenge" in msg.lower() or "467" in msg or "reels_tray" in msg:
+            detail = "Instagram accepted the password but your account needs manual verification. Open the Instagram app on your phone and follow the prompts, then wait 1-2 hours before trying again."
+        else:
+            detail = msg[:200]
+        raise HTTPException(status_code=401, detail=detail)
+
+    if isinstance(result, ig.ChallengeState):
+        # Encrypt the challenge state so the frontend can send it back
+        challenge_state_encrypted = crypto.encrypt(
+            json.dumps({
+                "settings": result.settings,
+                "last_json": result.last_json,
+                "username": result.username,
+                "password": result.password,
+            }),
+            SETTINGS.encryption_key,
+        )
+        log.info("Challenge state saved for %s", body.username)
+        db.set_status(body.user_id, "challenge_required", None)
+        return {
+            "ok": True,
+            "challenge_required": True,
+            "challenge_state": challenge_state_encrypted,
+            "user_id": body.user_id,
+            "username": body.username,
+        }
+
+    # Success — result is (client, encrypted)
+    cl, encrypted = result
     try:
         db.upsert_connection(body.user_id, body.username, encrypted)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
+        log.exception("DB upsert failed")
+        raise HTTPException(status_code=500, detail=f"DB error: {exc}")
+    return {
+        "ok": True,
+        "user_id": body.user_id,
+        "username": body.username,
+        "encrypted_session": encrypted,
+    }
+
+
+@app.post("/import-session")
+async def import_session(body: ImportSessionBody) -> dict[str, Any]:
+    """Import a real Instagram session from browser cookies.
+
+    Use this instead of /connect-instagram when Instagram blocks your IP
+    or triggers 467 after login. You provide cookies from a real browser
+    login and the worker uses them directly — no detectable login flow.
+    """
+    if not ig.is_available():
+        raise HTTPException(status_code=503, detail="instagrapi not installed")
+    settings_dict = ig.build_settings_from_cookies(
+        body.sessionid, body.ds_user_id, body.csrftoken,
+    )
+    err = ig.verify_session(settings_dict)
+    if err:
+        log.warning("Imported session invalid for %s: %s", body.username, err)
+        raise HTTPException(
+            status_code=401,
+            detail=f"Session invalid. Check your cookies: {err[:200]}",
+        )
+    encrypted = ig.encrypt_session(settings_dict)
+    try:
+        db.upsert_connection(body.user_id, body.username, encrypted)
+    except Exception as exc:
+        log.exception("DB upsert failed")
+        raise HTTPException(status_code=500, detail=f"DB error: {exc}")
+    log.info("Session imported successfully for %s", body.username)
+    return {
+        "ok": True,
+        "user_id": body.user_id,
+        "username": body.username,
+    }
+
+
+class ResolveChallengeBody(BaseModel):
+    user_id: str = Field(..., min_length=1)
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+    challenge_state: str = Field(
+        ..., min_length=1,
+        description="Encrypted challenge state from /connect-instagram or /send-challenge-code",
+    )
+    code: str = Field(..., min_length=1, description="Security code from Instagram email/SMS")
+
+
+class SendChallengeBody(BaseModel):
+    user_id: str = Field(..., min_length=1)
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+    challenge_state: str = Field(
+        ..., min_length=1,
+        description="Encrypted challenge state from /connect-instagram response",
+    )
+
+
+@app.post("/send-challenge-code")
+async def send_challenge_code(body: SendChallengeBody) -> dict[str, Any]:
+    """Trigger Instagram to send a verification code to the user's email/SMS.
+
+    Takes the challenge state from /connect-instagram, makes the initial
+    challenge API calls, and returns an *updated* challenge state that
+    should be passed to /resolve-challenge along with the code the user
+    receives.
+    """
+    if not ig.is_available():
+        raise HTTPException(status_code=503, detail="instagrapi not installed in this build")
+    try:
+        state = json.loads(crypto.decrypt(body.challenge_state, SETTINGS.encryption_key))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid challenge state: {exc}")
+    try:
+        updated_settings, updated_last_json = await asyncio.wait_for(
+            asyncio.to_thread(
+                ig.trigger_challenge_code,
+                state["settings"],
+                state["last_json"],
+                state["username"],
+                state["password"],
+            ),
+            timeout=30.0,
+        )
+    except asyncio.TimeoutError:
+        log.warning("Trigger challenge code timed out for %s", body.username)
+        raise HTTPException(status_code=408, detail="Sending verification code timed out. Try again.")
+    except Exception as exc:
+        msg = str(exc)
+        log.warning("Trigger challenge code failed for %s: %s", body.username, msg)
+        raise HTTPException(status_code=401, detail=msg[:200])
+
+    # Re-encrypt with updated settings + last_json
+    updated_state_encrypted = crypto.encrypt(
+        json.dumps({
+            "settings": updated_settings,
+            "last_json": updated_last_json,
+            "username": state["username"],
+            "password": state["password"],
+        }),
+        SETTINGS.encryption_key,
+    )
+    log.info("Verification code sent for %s", body.username)
+    return {
+        "ok": True,
+        "challenge_state": updated_state_encrypted,
+        "user_id": body.user_id,
+        "username": body.username,
+    }
+
+
+@app.post("/resolve-challenge")
+async def resolve_challenge(body: ResolveChallengeBody) -> dict[str, Any]:
+    """Submit a security code and complete the Instagram login.
+
+    The `challenge_state` should be the updated state returned by
+    /send-challenge-code (not the initial one from /connect-instagram).
+    """
+    if not ig.is_available():
+        raise HTTPException(status_code=503, detail="instagrapi not installed in this build")
+    try:
+        state = json.loads(crypto.decrypt(body.challenge_state, SETTINGS.encryption_key))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid challenge state: {exc}")
+    try:
+        cl, encrypted = await asyncio.wait_for(
+            asyncio.to_thread(
+                ig.submit_challenge_code,
+                state["settings"],
+                state["last_json"],
+                body.code,
+                state["username"],
+                state["password"],
+            ),
+            timeout=120.0,
+        )
+    except asyncio.TimeoutError:
+        log.warning("Challenge resolve timed out for %s", body.username)
+        db.set_status(body.user_id, "error", "Challenge resolve timed out")
+        raise HTTPException(status_code=408, detail="Verification took too long. Try again.")
+    except ig.ChallengeRequired:
+        log.warning("Challenge still required after code submission for %s", body.username)
+        db.set_status(body.user_id, "error", "Invalid code")
+        raise HTTPException(status_code=403, detail="Invalid code or Instagram still requires verification. Check the code and try again.")
+    except ig.FeedbackRequired as exc:
+        log.warning("Feedback required for %s: %s", body.username, exc)
+        db.set_status(body.user_id, "error", str(exc))
+        raise HTTPException(status_code=429, detail=f"Instagram feedback required: {exc}")
+    except Exception as exc:
+        msg = str(exc)
+        log.warning("Challenge resolve failed for %s: %s", body.username, msg)
+        db.set_status(body.user_id, "error", msg)
+        raise HTTPException(status_code=401, detail=msg[:200])
+    try:
+        db.upsert_connection(body.user_id, body.username, encrypted)
+    except Exception as exc:
         log.exception("DB upsert failed")
         raise HTTPException(status_code=500, detail=f"DB error: {exc}")
     return {

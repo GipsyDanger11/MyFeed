@@ -11,6 +11,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -29,7 +30,7 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName?: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
-  signOut: () => Promise<void>;
+  signOut: () => void;
   refreshProfile: () => Promise<Profile | null>;
 }
 
@@ -40,6 +41,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  /** Set during sign-out so the onAuthStateChange listener ignores
+   *  stray events (e.g. a queued auto-refresh tick that fires after
+   *  the session has been cleared). */
+  const signingOut = useRef(false);
 
   const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     const { data, error } = await supabase
@@ -82,6 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      // During sign-out we have already cleared local state; ignore
+      // any event (especially SIGNED_IN from a pending auto-refresh
+      // tick) that would restore the session.
+      if (signingOut.current) return;
       setSession(newSession);
       if (newSession?.user) {
         const p = await fetchProfile(newSession.user.id);
@@ -154,7 +163,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const signOut = useCallback(async () => {
+  const signOut = useCallback(() => {
+    // Guard onAuthStateChange from restoring the session mid-sign-out.
+    signingOut.current = true;
+
     // Prevent auto-refresh from re-reading the stale session from storage.
     supabase.auth.stopAutoRefresh();
 
@@ -162,27 +174,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setProfile(null);
 
-    // Wipe all Supabase auth keys from AsyncStorage BEFORE calling
-    // signOut().  signOut() internally calls __loadSession() which
-    // reads from storage — if the token is expired it will *refresh*
-    // the token, emit SIGNED_IN, and restore the session via the
-    // onAuthStateChange listener, defeating sign-out.
-    try {
-      const keys = await AsyncStorage.getAllKeys();
-      const supabaseKeys = keys.filter(
-        (k) =>
-          k.startsWith("supabase.auth.token") || k.startsWith("sb-"),
-      );
-      if (supabaseKeys.length > 0) {
-        await AsyncStorage.removeMany(supabaseKeys);
+    // Async cleanup: wipe storage + server-side sign-out (fire-and-forget).
+    (async () => {
+      try {
+        const keys = await AsyncStorage.getAllKeys();
+        const supabaseKeys = keys.filter(
+          (k) =>
+            k.startsWith("supabase.auth.token") || k.startsWith("sb-"),
+        );
+        if (supabaseKeys.length > 0) {
+          await AsyncStorage.multiRemove(supabaseKeys);
+        }
+      } catch {
+        // Storage may not be available; proceed anyway.
       }
-    } catch {
-      // Storage may not be available; proceed anyway.
-    }
-
-    // Best-effort server-side sign-out.  With storage already empty
-    // the internal __loadSession → _callRefreshToken path is a no-op.
-    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      signingOut.current = false;
+    })();
   }, []);
 
   const value = useMemo<AuthContextValue>(

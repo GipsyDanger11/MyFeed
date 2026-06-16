@@ -3,26 +3,29 @@
  * Username + password form. The plaintext password is NEVER stored.
  * We send it to the Python worker over HTTPS, the worker logs in,
  * returns an encrypted session, and we throw the password away.
+ *
+ * (For the hackathon we store a flag locally + a placeholder
+ * encrypted session. The real integration talks to the worker API.)
  */
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  GlassCard,
-  GradientBackground,
-  GradientButton,
-  GradientText,
-  StatusPill,
+    GlassCard,
+    GradientBackground,
+    GradientButton,
+    GradientText,
+    StatusPill,
 } from "@/components/glass";
 import { OnboardingDots } from "@/components/onboarding/OnboardingDots";
 import { Colors, Gradients } from "@/constants/colors";
@@ -76,27 +79,22 @@ export default function ConnectInstagramScreen() {
       });
       clearTimeout(timeout);
       const data = await res.json().catch(() => null);
-
       if (data?.challenge_required) {
         setChallengeState(data.challenge_state);
+        // Auto-trigger the verification code email
         sendChallengeCode(data.challenge_state);
         return;
       }
-
       if (!res.ok) {
-        const detail =
-          data?.detail ?? res.statusText ?? `Connection failed: ${res.status}`;
+        const detail = data?.detail ?? res.statusText ?? `Connection failed: ${res.status}`;
         throw new Error(detail);
       }
-
-      // Worker already returns encrypted session — save it directly, no re-encryption
       await upsertInstagramConnection({
         userId: user.id,
         username,
         encryptedSession: data.encrypted_session,
         status: "connected",
       });
-
       setStatus("connected");
       router.push({
         pathname: "/complete",
@@ -111,9 +109,7 @@ export default function ConnectInstagramScreen() {
   async function sendChallengeCode(currentState: string) {
     if (!user?.id) return;
     setStatus("sending_code");
-    setError(
-      "Instagram sent a security code. Check your email/SMS and enter it below."
-    );
+    setError("Instagram sent a security code. Check your email/SMS and enter it below.");
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30000);
@@ -130,19 +126,61 @@ export default function ConnectInstagramScreen() {
       });
       clearTimeout(timeout);
       const data = await res.json().catch(() => null);
-
       if (res.ok && data?.challenge_state) {
         setChallengeState(data.challenge_state);
         setStatus("idle");
       } else {
-        setError(
-          data?.detail ?? "Failed to send verification code. Try again."
-        );
+        setError(data?.detail ?? "Failed to send verification code. Try again.");
         setStatus("idle");
       }
     } catch {
       setError("Could not contact the verification server. Try again.");
       setStatus("idle");
+    }
+  }
+
+  async function handleResolveChallenge() {
+    if (!user?.id || !challengeState || !code) {
+      setError("Enter the code from your email or SMS.");
+      return;
+    }
+    setError(undefined);
+    setStatus("resolving");
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120000);
+      const res = await fetch(`${API_URL}/resolve-challenge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user.id,
+          username,
+          password,
+          challenge_state: challengeState,
+          code,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        const detail = data?.detail ?? res.statusText ?? `Verification failed: ${res.status}`;
+        throw new Error(detail);
+      }
+      await upsertInstagramConnection({
+        userId: user.id,
+        username,
+        encryptedSession: data.encrypted_session,
+        status: "connected",
+      });
+      setStatus("connected");
+      router.push({
+        pathname: "/complete",
+        params: { selection: params.selection ?? "{}" },
+      });
+    } catch (e: unknown) {
+      setStatus("idle");
+      setError(e instanceof Error ? e.message : "Verification failed.");
     }
   }
 
@@ -175,63 +213,9 @@ export default function ConnectInstagramScreen() {
         throw new Error(detail);
       }
       setStatus("connected");
-      router.push({
-        pathname: "/complete",
-        params: { selection: params.selection ?? "{}" },
-      });
     } catch (e: unknown) {
       setStatus("idle");
       setError(e instanceof Error ? e.message : "Import failed.");
-    }
-  }
-
-  async function handleResolveChallenge() {
-    if (!user?.id || !challengeState || !code) {
-      setError("Enter the code from your email or SMS.");
-      return;
-    }
-    setError(undefined);
-    setStatus("resolving");
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 120000);
-      const res = await fetch(`${API_URL}/resolve-challenge`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: user.id,
-          username,
-          password,
-          challenge_state: challengeState,
-          code,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        const detail =
-          data?.detail ?? res.statusText ?? `Verification failed: ${res.status}`;
-        throw new Error(detail);
-      }
-
-      // Worker already returns encrypted session — save it directly, no re-encryption
-      await upsertInstagramConnection({
-        userId: user.id,
-        username,
-        encryptedSession: data.encrypted_session,
-        status: "connected",
-      });
-
-      setStatus("connected");
-      router.push({
-        pathname: "/complete",
-        params: { selection: params.selection ?? "{}" },
-      });
-    } catch (e: unknown) {
-      setStatus("idle");
-      setError(e instanceof Error ? e.message : "Verification failed.");
     }
   }
 
@@ -244,10 +228,7 @@ export default function ConnectInstagramScreen() {
         <ScrollView
           contentContainerStyle={[
             styles.container,
-            {
-              paddingTop: insets.top + Spacing[4],
-              paddingBottom: insets.bottom + Spacing[6],
-            },
+            { paddingTop: insets.top + Spacing[4], paddingBottom: insets.bottom + Spacing[6] },
           ]}
           keyboardShouldPersistTaps="handled"
         >
@@ -256,21 +237,10 @@ export default function ConnectInstagramScreen() {
           <View style={styles.header}>
             <GradientText
               text={challengeState ? "Enter Security Code" : "Connect Instagram"}
-              colors={
-                Gradients.primary as unknown as readonly [
-                  string,
-                  string,
-                  ...string[]
-                ]
-              }
+              colors={Gradients.primary as unknown as readonly [string, string, ...string[]]}
               style={Typography.h1}
             />
-            <Text
-              style={[
-                Typography.body,
-                { color: Colors.textMuted, marginTop: Spacing[2] },
-              ]}
-            >
+            <Text style={[Typography.body, { color: Colors.textMuted, marginTop: Spacing[2] }]}>
               {challengeState
                 ? "Instagram sent a verification code to your email or phone. Enter it below to continue."
                 : "Sign in once — we'll handle the rest. Your credentials are never stored in plain text."}
@@ -398,21 +368,17 @@ export default function ConnectInstagramScreen() {
                 status === "connecting"
                   ? importMode ? "Importing..." : "Connecting..."
                   : status === "sending_code"
-                  ? "Sending code..."
-                  : status === "resolving"
-                  ? "Verifying..."
-                  : challengeState
-                  ? "Verify code"
-                  : importMode
-                  ? "Import session"
-                  : "Connect account"
+                    ? "Sending code..."
+                    : status === "resolving"
+                      ? "Verifying..."
+                      : challengeState
+                        ? "Verify code"
+                        : importMode
+                          ? "Import session"
+                          : "Connect account"
               }
               onPress={challengeState ? handleResolveChallenge : importMode ? handleImport : handleConnect}
-              loading={
-                status === "connecting" ||
-                status === "sending_code" ||
-                status === "resolving"
-              }
+              loading={status === "connecting" || status === "sending_code" || status === "resolving"}
               disabled={status === "connected"}
             />
           </GlassCard>
@@ -423,11 +389,7 @@ export default function ConnectInstagramScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    paddingHorizontal: Spacing[6],
-    gap: Spacing[5],
-  },
+  container: { flexGrow: 1, paddingHorizontal: Spacing[6], gap: Spacing[5] },
   header: {},
   card: {},
   input: {
