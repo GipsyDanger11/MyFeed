@@ -133,7 +133,14 @@ def build_client(settings_dict: dict[str, Any] | None = None) -> Any:
     cl.handle_exception = lambda client, exc: (_ for _ in ()).throw(exc)
     if settings_dict:
         cl.set_settings(settings_dict)
-        _patch_client(cl)
+        # Don't call _patch_client here — it would overwrite the saved
+        # device/UA with freshly-generated values, which Instagram detects
+        # as a mismatch and returns 400. The saved session already has the
+        # correct device fingerprint from the original login.
+        if SETTINGS.proxy:
+            proxies = [p.strip() for p in SETTINGS.proxy.split(",") if p.strip()]
+            proxy = random.choice(proxies) if len(proxies) > 1 else proxies[0]
+            cl.set_proxy(proxy)
     return cl
 
 

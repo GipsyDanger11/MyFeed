@@ -168,20 +168,18 @@ async def import_session(body: ImportSessionBody) -> dict[str, Any]:
     settings_dict = ig.build_settings_from_cookies(
         body.sessionid, body.ds_user_id, body.csrftoken,
     )
+    # Try to verify, but don't fail on challenge — the session might still work
+    # after the user resolves the challenge on their browser.
     err = ig.verify_session(settings_dict)
     if err:
-        log.warning("Imported session invalid for %s: %s", body.username, err)
-        raise HTTPException(
-            status_code=401,
-            detail=f"Session invalid. Check your cookies: {err[:200]}",
-        )
+        log.warning("Imported session has issues for %s: %s", body.username, err)
     encrypted = ig.encrypt_session(settings_dict)
     try:
         db.upsert_connection(body.user_id, body.username, encrypted)
     except Exception as exc:
         log.exception("DB upsert failed")
         raise HTTPException(status_code=500, detail=f"DB error: {exc}")
-    log.info("Session imported successfully for %s", body.username)
+    log.info("Session imported for %s (verify: %s)", body.username, "OK" if not err else "WARN")
     return {
         "ok": True,
         "user_id": body.user_id,
